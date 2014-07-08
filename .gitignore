@@ -1,0 +1,5 @@
+*.pyc
+.vagrant
+python-scraper
+scrapyd-fancy-ui
+.idea
