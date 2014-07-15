@@ -36,25 +36,24 @@ def move_scrapyd_configs(db_number):
         f.write(s)
         f.close()
 
-def _download_projects(username, password, db_number):
+def _download_projects(username, db_number):
     with cd('/vagrant'):
         if not exists('/vagrant/python-scraper') or not exists('/vagrant/scrapyd-fancy-ui'):
-            print "In order to download the scraper repository, we need your username and password to continue."
+            print "In order to download the scraper repository, we need your username to continue."
         if not exists('/vagrant/python-scraper'):
-            run('git clone https://%s:%s@github.com/%s/python-scraper.git' % (username, password, username))
+            run('git clone https://www.github.com/%s/python-scraper.git' % username)
             move_scrapy_configs()
         if not exists('/vagrant/scrapyd-fancy-ui'):
-            run('git clone https://%s:%s@github.com/%s/scrapyd-fancy-ui.git' % (username, password, username))
+            run('git clone https://www.github.com/%s/scrapyd-fancy-ui.git' % username)
             move_scrapyd_configs(db_number)
 
 def ask_data():
-    username = prompt('1/3. Username of github:')
-    password = getpass.getpass('2/3. Password of github:')
+    username = prompt('1/2. Username of github:')
     valid = False
     while not valid:
         MIN_REDIS_DB_NUMBER = 1
         MAX_REDIS_DB_NUMBER = 9
-        db_number = prompt("3/3. Your Redis database number: (%s-%s)" % (MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER))
+        db_number = prompt("2/2. Your Redis database number: (%s-%s)" % (MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER))
         try:
             db_number = int(db_number)
             if db_number not in range(MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER):
@@ -63,7 +62,7 @@ def ask_data():
                 valid = True
         except ValueError:
             print "Please, enter a valid database number (from %s to %s)" % (MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER)
-    return username, password, db_number
+    return username, db_number
 
 def cleanup():
     sudo('rm -rf /home/vagrant/src')
@@ -78,9 +77,9 @@ def install():
     print "Welcome to the installer of the MyTaste Scraper"
     print '------------------------------------------------'
     print 'First of all, we need some information about your specific configuration to build your environment.\n'
-    username, password, db_number = ask_data()
+    username, db_number = ask_data()
 
-    _download_projects(username, password, db_number)
+    _download_projects(username, db_number)
 
     sudo('yum -y upgrade')
     sudo('yum -y groupinstall "Development tools"')
