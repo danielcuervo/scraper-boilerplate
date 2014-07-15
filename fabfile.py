@@ -62,7 +62,7 @@ def ask_data():
                 valid = True
         except ValueError:
             print "Please, enter a valid database number (from %s to %s)" % (MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER)
-    return username, password, db_number
+    return username, db_number
 
 def cleanup():
     sudo('rm -rf /home/vagrant/src')
