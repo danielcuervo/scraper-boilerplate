@@ -23,8 +23,7 @@ def scrapyd_file(filepath):
 
 def move_scrapy_configs():
     with cd('/vagrant/python-scraper'):
-        put(scrapy_file('processes_settings.py'), 'processes/settings.py')
-        put(scrapy_file('scraper_settings.py'), 'py203scraper/settings.py')
+        put(scrapy_file('processes_settings.py'), 'processes/local_settings.py')
         put(scrapy_file('scrapy_settings.cfg'), 'scrapy.cfg')
 
 def move_scrapyd_configs(db_number):
