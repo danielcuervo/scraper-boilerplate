@@ -2,7 +2,7 @@
  # -*- coding: utf-8 -*-
 
 from vagrant import vagrant
-from fabric.api import cd, sudo, run, put, settings, task
+from fabric.api import cd, sudo, run, put, settings, task, local
 from fabric.operations import prompt
 from fabric.contrib.files import exists
 import getpass
@@ -79,8 +79,9 @@ def install():
     print 'First of all, we need some information about your specific configuration to build your environment.\n'
     username, db_number = ask_data()
 
+    local('sudo mkdir -p /var/log/scrapyd')
+    
     _download_projects(username, db_number)
-
     sudo('yum -y upgrade')
     sudo('yum -y groupinstall "Development tools"')
     sudo('yum -y install wget zlib-devel bzip2-devel ncurses-devel libxml2 libxml2-dev libxslt libxslt-devel mysql-server mysql-devel sqlite-devel redis')
