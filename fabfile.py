@@ -39,12 +39,12 @@ def move_scrapyd_configs(db_number):
 def _download_projects(username, db_number):
     with cd('/vagrant'):
         if not exists('/vagrant/python-scraper') or not exists('/vagrant/scrapyd-fancy-ui'):
-            print "In order to download the scraper repository, we need your username and password to continue."
+            print "In order to download the scraper repository, we need your username to continue."
         if not exists('/vagrant/python-scraper'):
             run('git clone https://www.github.com/%s/python-scraper.git' % username)
             move_scrapy_configs()
         if not exists('/vagrant/scrapyd-fancy-ui'):
-            run('git clone https://%s:%s@github.com/%s/scrapyd-fancy-ui.git' % (username, password, username))
+            run('git clone https://www.github.com/%s/scrapyd-fancy-ui.git' % username)
             move_scrapyd_configs(db_number)
 
 def ask_data():
