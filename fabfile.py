@@ -21,34 +21,11 @@ def scrapyd_file(filepath):
     return pkg_resources.resource_filename(__name__,
                                            '/config/scrapyd/{0}'.format(filepath))
 
-def graphite_file(filepath):
-    return pkg_resources.resource_filename(__name__,
-                                           '/config/graphite/{0}'.format(filepath))
-
-def statsd_file(filepath):
-    return pkg_resources.resource_filename(__name__,
-                                           '/config/statsd/{0}'.format(filepath))
-
-def grafana_file(filepath):
-    return pkg_resources.resource_filename(__name__,
-                                           '/config/grafana/{0}'.format(filepath))
-
-def command_exists(command):
-    """
-    Checks if the command 'command' exists
-    """
-    result = False
-    with settings(warn_only=True):
-        checked = run('command -v %s' % command)
-        if checked.return_code == 0:
-            result = True
-
-    return result
-
 def move_scrapy_configs():
-    put(scrapy_file('processes_settings.py'), '/vagrant/python-scraper/processes/settings.py')
-    put(scrapy_file('scraper_settings.py'), '/vagrant/python-scraper/py203scraper/settings.py')
-    put(scrapy_file('scrapy_settings.py'), '/vagrant/python-scraper/scrapy.cfg')
+    with cd('/vagrant/python-scraper'):
+        put(scrapy_file('processes_settings.py'), 'processes/settings.py')
+        put(scrapy_file('scraper_settings.py'), 'py203scraper/settings.py')
+        put(scrapy_file('scrapy_settings.cfg'), 'scrapy.cfg')
 
 def move_scrapyd_configs(db_number):
     with cd('/vagrant/'):
@@ -88,15 +65,11 @@ def ask_data():
             print "Please, enter a valid database number (from %s to %s)" % (MIN_REDIS_DB_NUMBER, MAX_REDIS_DB_NUMBER)
     return username, password, db_number
 
-@task
-def install():
-    install_scraper()
-    install_graphite()
-    install_statsd()
-    install_grafana()
+def cleanup():
+    sudo('rm -rf /home/vagrant/src')
 
 @task
-def install_scraper():
+def install():
     '''
     Installs Python Scraper and dependencies
     '''
@@ -140,154 +113,11 @@ def install_scraper():
     with cd('/home/vagrant/src'):
         sudo('pip install -r requeriments.txt')
 
-@task
-def scrapyd(action):
-    if action in ('start', 'stop', 'restart'):
-        if action == 'start':
-            with cd('/vagrant/scrapyd-fancy-ui'):
-                run('twistd -ny extras/scrapyd.tac &')
-    else:
-        print "the parameter has to be 'start', 'stop' or 'restart'"
+    sudo('mkdir -p /var/log/scrapyd')
+    sudo('chmod 777 /var/log/scrapyd')
 
-"""
- ===========================
-    Graphite installation
- ===========================
-"""
-@task
-def install_graphite():
-    """
-    Installs Graphite and dependencies
-    """
-    sudo('pip install supervisor simplejson') # required for django admin
-    sudo('mkdir -p /opt/graphite')
-    sudo('chmod 777 -R /opt')
-    sudo('pip install git+https://github.com/graphite-project/carbon.git@0.9.x#egg=carbon')
-    sudo('pip install git+https://github.com/graphite-project/whisper.git@master#egg=whisper')
-    sudo('pip install django==1.5.2 django-tagging uwsgi')
-    sudo('pip install git+https://github.com/graphite-project/graphite-web.git@0.9.x#egg=graphite-web')
-
-    # Downloading PCRE source (Required for nginx)
-    with cd('/home/vagrant'):
-        run('wget http://sourceforge.net/projects/pcre/files/pcre/8.33/pcre-8.33.tar.gz/download# -O pcre-8.33.tar.gz')
-        run('tar -zxvf pcre-8.33.tar.gz')
-
-    # creating nginx etc and log folders
-    sudo('mkdir -p /etc/nginx')
-    sudo('mkdir -p /var/log/nginx')
-    sudo('chmod 777 -R /etc/nginx')
-    sudo('chmod 777 -R /var/log/nginx')
-    sudo('chown -R vagrant: /var/log/nginx')
-
-    # creating automatic startup scripts for nginx and carbon
-    put(graphite_file('nginx'), '/etc/init.d/', use_sudo=True)
-    put(graphite_file('carbon'), '/etc/init.d/', use_sudo=True)
-    sudo('chmod ugo+x /etc/init.d/nginx')
-    sudo('chmod ugo+x /etc/init.d/carbon')
-    put(graphite_file('glyph.py'), '/opt/graphite/webapp/graphite/render', use_sudo=True)
-    sudo('chkconfig nginx on')
-    sudo('chkconfig carbon on')
-
-    # downloading nginx source
-    with cd('/home/vagrant'):
-        run('wget http://nginx.org/download/nginx-1.2.7.tar.gz')
-        run('tar -zxvf nginx-1.2.7.tar.gz')
-
-    # installing nginx
-    with cd('/home/vagrant/nginx-1.2.7'):
-        sudo('./configure --prefix=/usr --with-pcre=/home/vagrant/pcre-8.33/ --with-http_ssl_module --with-http_gzip_static_module --conf-path=/etc/nginx/nginx.conf --pid-path=/var/run/nginx.pid --lock-path=/var/lock/nginx.lock --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --user=vagrant --group=vagrant')
-        sudo('make && make install')
-
-    # copying nginx and uwsgi configuration files
-    sudo('mkdir -p /etc/supervisor/conf.d/')
-    put(graphite_file('nginx.conf'), '/etc/nginx/', use_sudo=True)
-    put(graphite_file('supervisord.conf'), '/etc/supervisord.conf', use_sudo=True)
-    put(graphite_file('uwsgi.conf'), '/etc/supervisor/conf.d/', use_sudo=True)
-    sudo('yum install -y libpng-devel pixman pixman-devel cairo pycairo')
-    
-    
-    sudo('echo "/usr/lib" > /etc/ld.so.conf.d/pycairo.conf')
-    sudo('ldconfig')
-    # setting the carbon config files (default)
-    with cd('/opt/graphite/conf/'):
-        sudo('cp carbon.conf.example carbon.conf')
-        put(graphite_file('storage-schemas.conf'), 'storage-schemas.conf')
-    # clearing old carbon log files
-    put(graphite_file('carbon-logrotate'), '/etc/cron.daily/', use_sudo=True, mode=0755)
-
-    # initializing graphite django db
-    with cd('/opt/graphite/webapp/graphite'):
-        sudo("/usr/bin/python2.7 manage.py syncdb")
-
-    # changing ownership on graphite folders
-    sudo('chown -R vagrant: /opt/graphite/')
-
-    # starting uwsgi
-    run('supervisord')
-    run('supervisorctl update && supervisorctl restart uwsgi')
-
-    # starting carbon-cache
-    sudo('/etc/init.d/carbon start')
-
-    # starting nginx
-    sudo('nginx')
-
-"""
- ===========================
-    Statsd installation
- ===========================
-"""
-@task
-def install_statsd():
-    """
-    Installs etsy's node.js statsd and dependencies
-    """
-    sudo('yum install -y build-essential supervisor make git-core')
-    with cd('/home/vagrant'):
-        run('wget -N http://nodejs.org/dist/node-latest.tar.gz')
-        run('tar -zxvf node-latest.tar.gz')
-        sudo('cd `ls -rd node-v*` && make install')
-
-    with cd('/opt'):
-        run('git clone https://github.com/etsy/statsd.git')
-
-    with cd('/opt/statsd'):
-        run('git checkout v0.7.1') # or comment this out and stay on trunk
-        put(statsd_file('localConfig.js'), 'localConfig.js', use_sudo=True)
-        run('npm install')
-    put(statsd_file('statsd.conf'), '/etc/supervisor/conf.d/', use_sudo=True)
-    sudo('supervisorctl update && supervisorctl start statsd')
-
-    # UDP buffer tuning for statsd
-    sudo('mkdir -p /etc/sysctl.d')
-    put(statsd_file('10-statsd.conf'), '/etc/sysctl.d/', use_sudo=True)
-    sudo('sysctl -p /etc/sysctl.d/10-statsd.conf')
-
-"""
- ===========================
-    Grafana installation
- ===========================
-"""
+    cleanup()
 
 @task
-def install_grafana():
-    """
-    Installs Grafana
-    """
-    with cd('/home/vagrant'):
-        run('wget http://grafanarel.s3.amazonaws.com/grafana-1.6.0.tar.gz')
-        run('tar -xzvf grafana-1.6.0.tar.gz')
-        sudo('mv grafana-1.6.0/ /opt/grafana')
-    with cd('/opt/grafana'):
-        put(grafana_file('config.js'), 'config.js', use_sudo=True)
-
-    sudo('nginx -s reload')
-
-
-def install_elasticsearch():
-    sudo('yum install -y java-1.7.0-openjdk java-1.7.0-openjdk-devel')
-    with cd('/home/vagrant'):
-        run('wget https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.2.1.noarch.rpm')
-        sudo('rpm -iv elasticsearch-1.2.1.noarch.rpm')
-    sudo('service elasticsearch start')
-
+def up():
+    sudo('service redis start')
