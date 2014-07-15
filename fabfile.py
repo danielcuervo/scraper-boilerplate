@@ -44,7 +44,7 @@ def _download_projects(username, db_number):
             run('git clone https://%s@github.com/%s/python-scraper.git' % (username, username) )
             move_scrapy_configs()
         if not exists('/vagrant/scrapyd-fancy-ui'):
-            run('git clone https://%sgithub.com/%s/scrapyd-fancy-ui.git' % (username, username))
+            run('git clone https://%s@github.com/%s/scrapyd-fancy-ui.git' % (username, username))
             move_scrapyd_configs(db_number)
 
 def ask_data():
@@ -80,7 +80,7 @@ def install():
     username, db_number = ask_data()
 
     local('sudo mkdir -p /var/log/scrapyd')
-    
+
     _download_projects(username, db_number)
     sudo('yum -y upgrade')
     sudo('yum -y groupinstall "Development tools"')
