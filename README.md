@@ -32,4 +32,4 @@ vagrant box add centos https://github.com/2creatives/vagrant-centos/releases/dow
 
 vagrant up
 
-fab vagrant install_scraper
+fab vagrant install
