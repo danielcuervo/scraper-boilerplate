@@ -2,7 +2,7 @@
  # -*- coding: utf-8 -*-
 
 from vagrant import vagrant
-from fabric.api import cd, sudo, run, put, settings, task
+from fabric.api import cd, sudo, run, put, settings, task, local
 from fabric.operations import prompt
 from fabric.contrib.files import exists
 import getpass
@@ -23,8 +23,7 @@ def scrapyd_file(filepath):
 
 def move_scrapy_configs():
     with cd('/vagrant/python-scraper'):
-        put(scrapy_file('processes_settings.py'), 'processes/settings.py')
-        put(scrapy_file('scraper_settings.py'), 'py203scraper/settings.py')
+        put(scrapy_file('processes_settings.py'), 'processes/local_settings.py')
         put(scrapy_file('scrapy_settings.cfg'), 'scrapy.cfg')
 
 def move_scrapyd_configs(db_number):
@@ -44,7 +43,7 @@ def _download_projects(username, db_number):
             run('git clone https://%s@github.com/%s/python-scraper.git' % (username, username) )
             move_scrapy_configs()
         if not exists('/vagrant/scrapyd-fancy-ui'):
-            run('git clone https://%sgithub.com/%s/scrapyd-fancy-ui.git' % (username, username))
+            run('git clone https://%s@github.com/%s/scrapyd-fancy-ui.git' % (username, username))
             move_scrapyd_configs(db_number)
 
 def ask_data():
@@ -79,8 +78,9 @@ def install():
     print 'First of all, we need some information about your specific configuration to build your environment.\n'
     username, db_number = ask_data()
 
-    _download_projects(username, db_number)
+    local('sudo mkdir -p /var/log/scrapyd')
 
+    _download_projects(username, db_number)
     sudo('yum -y upgrade')
     sudo('yum -y groupinstall "Development tools"')
     sudo('yum -y install wget zlib-devel bzip2-devel ncurses-devel libxml2 libxml2-dev libxslt libxslt-devel mysql-server mysql-devel sqlite-devel redis')
